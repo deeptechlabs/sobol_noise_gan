@@ -128,7 +128,7 @@ class Solver(object):
                     fake_images = self.generator(noise)
                     torchvision.utils.save_image(self.denorm(fake_images.data), 
                         os.path.join(self.sample_path,
-                                     'fake_samples-%d-%d.png' %(epoch+1, i+1)))
+                                     'fake_samples-%d-%d-sobol-%s.png' %(epoch+1, i+1, self.sobol_noise)))
             
             # save the model parameters for each epoch
             g_path = os.path.join(self.model_path, 'generator-%d.pkl' %(epoch+1))
@@ -149,7 +149,7 @@ class Solver(object):
         # Sample the images
         noise = self.to_variable(torch.randn(self.sample_size, self.z_dim))
         fake_images = self.generator(noise)
-        sample_path = os.path.join(self.sample_path, 'fake_samples-final.png')
+        sample_path = os.path.join(self.sample_path, 'fake_samples-final-' + str(self.sobol_noise)+ '.png')
         torchvision.utils.save_image(self.denorm(fake_images.data), sample_path, nrow=12)
         
         print("Saved sampled images to '%s'" %sample_path)

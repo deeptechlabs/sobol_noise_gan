@@ -1,7 +1,6 @@
 ## Sobol Noise Vector Comparison with Normal Distribution
 
-
-## Usage 
+## Usage
 
 #### 1. Install the dependencies
 ```bash
@@ -19,7 +18,12 @@ $ ./download.sh
 $ python main.py --mode='train'
 ```
 
-#### 3. Sample the images
+#### 4. Train the model (Sobol)
+```bash
+$ python main.py --mode='train' --sobol_noise
+```
+
+#### 5. Sample the images
 ```bash
 $ python main.py --mode='sample'
 ```
