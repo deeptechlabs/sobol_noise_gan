@@ -1,6 +1,8 @@
 import torch
 import torchvision
 import os
+import sobol
+
 from torch import optim
 from torch.autograd import Variable
 from model import Discriminator
@@ -28,6 +30,7 @@ class Solver(object):
         self.sample_step = config.sample_step
         self.sample_path = config.sample_path
         self.model_path = config.model_path
+        self.sobol_noise = config.sobol_noise
         self.build_model()
         
     def build_model(self):
@@ -70,7 +73,12 @@ class Solver(object):
 
     def train(self):
         """Train generator and discriminator."""
-        fixed_noise = self.to_variable(torch.randn(self.batch_size, self.z_dim))
+        if self.sobol_noise:
+            sobol_noise = sobol.i4_sobol_generate_std_normal(self.batch_size, self.z_dim)
+            sobol_noise = torch.from_numpy(sobol_noise)
+            noise = self.to_variable(sobol_noise)
+        else:
+            noise = self.to_variable(torch.randn(self.batch_size, self.z_dim))
         total_step = len(self.data_loader)
         for epoch in range(self.num_epochs):
             for i, images in enumerate(self.data_loader):
@@ -107,17 +115,17 @@ class Solver(object):
                 self.reset_grad()
                 g_loss.backward()
                 self.g_optimizer.step()
-    
+
                 # print the log info
                 if (i+1) % self.log_step == 0:
                     print('Epoch [%d/%d], Step[%d/%d], d_real_loss: %.4f, ' 
-                          'd_fake_loss: %.4f, g_loss: %.4f' 
-                          %(epoch+1, self.num_epochs, i+1, total_step, 
-                            real_loss.data[0], fake_loss.data[0], g_loss.data[0]))
+                            'd_fake_loss: %.4f, g_loss: %.4f' 
+                            %(epoch+1, self.num_epochs, i+1, total_step, 
+                                real_loss.data[0], fake_loss.data[0], g_loss.data[0]))
 
-                # save the sampled images
+                            # save the sampled images
                 if (i+1) % self.sample_step == 0:
-                    fake_images = self.generator(fixed_noise)
+                    fake_images = self.generator(noise)
                     torchvision.utils.save_image(self.denorm(fake_images.data), 
                         os.path.join(self.sample_path,
                                      'fake_samples-%d-%d.png' %(epoch+1, i+1)))
