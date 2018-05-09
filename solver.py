@@ -2,6 +2,7 @@ import torch
 import torchvision
 import os
 import sobol
+import numpy as np
 
 from torch import optim
 from torch.autograd import Variable
@@ -74,11 +75,15 @@ class Solver(object):
     def train(self):
         """Train generator and discriminator."""
         if self.sobol_noise:
-            sobol_noise = sobol.i4_sobol_generate_std_normal(self.batch_size, self.z_dim)
+            sobol_noise = sobol.i4_sobol_generate(self.batch_size, self.z_dim)
+            sobol_noise = np.transpose(sobol_noise)
             sobol_noise = torch.from_numpy(sobol_noise)
-            noise = self.to_variable(sobol_noise)
+            sobol_noise = sobol_noise.float()
+            fixed_noise = self.to_variable(sobol_noise)
+            #print(sobol_noise)
+            #print(sobol_noise.size())
         else:
-            noise = self.to_variable(torch.randn(self.batch_size, self.z_dim))
+            fixed_noise = self.to_variable(torch.randn(self.batch_size, self.z_dim))
         total_step = len(self.data_loader)
         for epoch in range(self.num_epochs):
             for i, images in enumerate(self.data_loader):
@@ -86,8 +91,18 @@ class Solver(object):
                 #===================== Train D =====================#
                 images = self.to_variable(images)
                 batch_size = images.size(0)
-                noise = self.to_variable(torch.randn(batch_size, self.z_dim))
-                
+                if self.sobol_noise:
+                    sobol_noise = sobol.i4_sobol_generate(batch_size, self.z_dim)
+                    sobol_noise = np.transpose(sobol_noise)
+                    sobol_noise = torch.from_numpy(sobol_noise)
+                    sobol_noise = sobol_noise.float()
+                    noise = self.to_variable(sobol_noise)
+                    #print(sobol_noise)
+                    #print(sobol_noise.size())
+                else:
+                    noise = self.to_variable(torch.randn(batch_size, self.z_dim))
+                    #print(noise.size())
+
                 # Train D to recognize real images as real.
                 outputs = self.discriminator(images)
                 real_loss = torch.mean((outputs - 1) ** 2)      # L2 loss instead of Binary cross entropy loss (this is optional for stable training)
@@ -104,7 +119,16 @@ class Solver(object):
                 self.d_optimizer.step()
                 
                 #===================== Train G =====================#
-                noise = self.to_variable(torch.randn(batch_size, self.z_dim))
+                if self.sobol_noise:
+                    sobol_noise = sobol.i4_sobol_generate(batch_size, self.z_dim)
+                    sobol_noise = np.transpose(sobol_noise)
+                    sobol_noise = torch.from_numpy(sobol_noise)
+                    sobol_noise = sobol_noise.float()
+                    noise = self.to_variable(sobol_noise)
+                    #print(sobol_noise)
+                    #print(sobol_noise.size())
+                else:
+                    noise = self.to_variable(torch.randn(batch_size, self.z_dim))
                 
                 # Train G so that D recognizes G(z) as real.
                 fake_images = self.generator(noise)
@@ -125,22 +149,22 @@ class Solver(object):
 
                             # save the sampled images
                 if (i+1) % self.sample_step == 0:
-                    fake_images = self.generator(noise)
+                    fake_images = self.generator(fixed_noise)
                     torchvision.utils.save_image(self.denorm(fake_images.data), 
                         os.path.join(self.sample_path,
                                      'fake_samples-%d-%d-sobol-%s.png' %(epoch+1, i+1, self.sobol_noise)))
             
             # save the model parameters for each epoch
-            g_path = os.path.join(self.model_path, 'generator-%d.pkl' %(epoch+1))
-            d_path = os.path.join(self.model_path, 'discriminator-%d.pkl' %(epoch+1))
+            g_path = os.path.join(self.model_path, 'generator-%d-sobol-%s.pkl' %(epoch+1, str(self.sobol_noise)))
+            d_path = os.path.join(self.model_path, 'discriminator-%d-sobol-%s.pkl' %(epoch+1, str(self.sobol_noise)))
             torch.save(self.generator.state_dict(), g_path)
             torch.save(self.discriminator.state_dict(), d_path)
             
     def sample(self):
         
         # Load trained parameters 
-        g_path = os.path.join(self.model_path, 'generator-%d.pkl' %(self.num_epochs))
-        d_path = os.path.join(self.model_path, 'discriminator-%d.pkl' %(self.num_epochs))
+        g_path = os.path.join(self.model_path, 'generator-%d-sobol-%s.pkl' %(self.num_epochs, str(self.sobol_noise)))
+        d_path = os.path.join(self.model_path, 'discriminator-%d-sobol-%s.pkl' %(self.num_epochs, str(self.sobol_noise)))
         self.generator.load_state_dict(torch.load(g_path))
         self.discriminator.load_state_dict(torch.load(d_path))
         self.generator.eval()
